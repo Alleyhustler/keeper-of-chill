@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keeper of Chill</title>
+    <style>
+        :root {
+            --bg-color: #020202;
+            /* Yellow/Gold Tones */
+            --keeper-gold: #ffcc33;
+            --keeper-glow: rgba(255, 204, 51, 0);
+            --text-main: #fff9e6;
+            --vignette-scale: 45%;
+            --atmosphere-blur: 0px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; cursor: none; }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Optima', 'Georgia', serif;
+        }
+
+        /* The Environment */
+        #world {
+            position: fixed;
+            top: -5%; left: -5%;
+            width: 110%; height: 110%;
+            background: url('bg.png') center/cover no-repeat;
+            filter: brightness(0.25) blur(var(--atmosphere-blur)) sepia(20%);
+            z-index: 1;
+            transition: filter 1s ease;
+        }
+
+        /* The Threshold - Warps around the cursor */
+        #vignette {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+                        transparent 0%, 
+                        rgba(0,0,0,0.85) var(--vignette-scale), 
+                        rgba(0,0,0,1) 100%);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* The Guardian Vessel */
+        #guardian-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 320px; height: 320px;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            perspective: 1200px;
+        }
+
+        #logo-vessel {
+            width: 100%;
+            height: auto;
+            filter: drop-shadow(0 0 40px var(--keeper-glow));
+            transition: filter 1.5s ease, opacity 0.8s ease;
+            opacity: 0.5;
+            transform-style: preserve-3d;
+        }
+
+        /* The Guardian's Voice - Bright & Fast */
+        #whisper-field {
+            position: fixed;
+            pointer-events: none;
+            font-size: 0.85rem;
+            font-weight: bold;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--keeper-gold);
+            text-shadow: 0 0 15px rgba(255, 204, 51, 0.8);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.4s ease, transform 0.6s cubic-bezier(0.165, 0.84, 0.44, 1);
+            font-family: 'Courier New', monospace;
+            z-index: 100;
+        }
+
+        /* Layout UI */
+        .ui-layer {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 50px;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0;
+            animation: emerge 4s forwards 1.5s;
+        }
+
+        .identity-text h1 {
+            font-weight: 300;
+            letter-spacing: 0.7em;
+            font-size: 1rem;
+            text-transform: uppercase;
+            color: var(--keeper-gold);
+            opacity: 0.7;
+        }
+
+        .portal-link {
+            pointer-events: auto;
+            color: var(--keeper-gold);
+            text-decoration: none;
+            font-size: 0.7rem;
+            letter-spacing: 0.5em;
+            opacity: 0.3;
+            transition: 0.6s;
+            font-family: monospace;
+        }
+
+        .portal-link:hover { opacity: 1; letter-spacing: 0.7em; }
+
+        @keyframes emerge { to { opacity: 1; } }
+
+        /* User's Presence (Custom Cursor) */
+        #presence-orb {
+            position: fixed;
+            width: 6px; height: 6px;
+            background: var(--keeper-gold);
+            box-shadow: 0 0 10px var(--keeper-gold);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 101;
+            transition: transform 0.1s ease;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="presence-orb"></div>
+    <div id="whisper-field"></div>
+    <div id="world"></div>
+    <div id="vignette"></div>
+
+    <div id="guardian-container">
+        <img src="logo.png" id="logo-vessel" alt="The Keeper">
+    </div>
+
+    <div class="ui-layer">
+        <div class="identity-text">
+            <h1>Keeper of Chill</h1>
+            <p style="font-size: 0.6rem; letter-spacing: 0.3em; opacity: 0.4; margin-top: 15px; text-transform: uppercase;">
+                Guardian of the Realm Between Overstimulation and Peace
+            </p>
+        </div>
+        <a href="https://x.com/yourhandle" class="portal-link" target="_blank">TWITTER / PUMPFUN / COIN / SEND / KEEPER</a>
+    </div>
+
+    <script>
+        const vessel = document.getElementById('logo-vessel');
+        const whisper = document.getElementById('whisper-field');
+        const orb = document.getElementById('presence-orb');
+        const root = document.documentElement;
+
+        let mX = 0, mY = 0; // Target
+        let cX = 0, cY = 0; // Current
+        let vel = 0;
+        let lastX = 0, lastY = 0;
+        let isSpeaking = false;
+
+        const thoughts = [
+            "Noise is an illusion.",
+            "Stability recognized.",
+            "You are breathing. Good.",
+            "The threshold is secure.",
+            "Stillness is power.",
+            "Welcome back to center.",
+            "Focus on the light.",
+            "I am watching the drift."
+        ];
+
+        window.addEventListener('mousemove', (e) => {
+            mX = e.clientX;
+            mY = e.clientY;
+            
+            vel = Math.sqrt(Math.pow(e.clientX - lastX, 2) + Math.pow(e.clientY - lastY, 2));
+            lastX = e.clientX;
+            lastY = e.clientY;
+
+            orb.style.left = e.clientX + 'px';
+            orb.style.top = e.clientY + 'px';
+        });
+
+        function animate() {
+            // Smooth heavy lag for the Guardian
+            cX += (mX - (window.innerWidth / 2) - cX) * 0.05;
+            cY += (mY - (window.innerHeight / 2) - cY) * 0.05;
+
+            // Tilt the logo toward the user
+            const rotX = cY * -0.06;
+            const rotY = cX * 0.06;
+            vessel.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg) scale(1.05)`;
+
+            // Environment Reaction
+            const stress = Math.min(vel / 40, 1);
+            const vigSize = 45 - (stress * 20);
+            
+            root.style.setProperty('--atmosphere-blur', `${stress * 8}px`);
+            root.style.setProperty('--vignette-scale', `${vigSize}%`);
+            root.style.setProperty('--mouse-x', `${(mX / window.innerWidth) * 100}%`);
+            root.style.setProperty('--mouse-y', `${(mY / window.innerHeight) * 100}%`);
+
+            // Proximity logic
+            const dist = Math.sqrt(Math.pow(mX - window.innerWidth/2, 2) + Math.pow(mY - window.innerHeight/2, 2));
+            
+            if (dist < 350) {
+                vessel.style.opacity = "1";
+                root.style.setProperty('--keeper-glow', 'rgba(255, 204, 51, 0.4)');
+                
+                // Frequency of speech is now much higher (0.04)
+                if (!isSpeaking && Math.random() < 0.04 && vel < 10) {
+                    speak();
+                }
+            } else {
+                vessel.style.opacity = "0.4";
+                root.style.setProperty('--keeper-glow', 'rgba(255, 204, 51, 0)');
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        function speak() {
+            isSpeaking = true;
+            whisper.innerText = thoughts[Math.floor(Math.random() * thoughts.length)];
+            
+            // Appears right above the user presence
+            whisper.style.left = (mX + 20) + 'px';
+            whisper.style.top = (mY - 30) + 'px';
+            
+            // Quick fade in
+            whisper.style.opacity = "1";
+            whisper.style.transform = "translateY(-15px)";
+
+            // Disappears faster (2 seconds)
+            setTimeout(() => {
+                whisper.style.opacity = "0";
+                whisper.style.transform = "translateY(0px)";
+                setTimeout(() => { isSpeaking = false; }, 800); // Short cooldown
+            }, 2000);
+        }
+
+        animate();
+
+        // Subtle Click - Golden Pulse
+        window.addEventListener('mousedown', () => {
+            root.style.setProperty('--vignette-scale', '90%');
+            vessel.style.filter = "drop-shadow(0 0 60px rgba(255, 204, 51, 0.8))";
+            orb.style.transform = "scale(4)";
+        });
+
+        window.addEventListener('mouseup', () => {
+            vessel.style.filter = "drop-shadow(0 0 40px var(--keeper-glow))";
+            orb.style.transform = "scale(1)";
+        });
+
+    </script>
+</body>
+</html>
